@@ -1,0 +1,119 @@
+﻿@page "/"
+@using tp6.Models
+
+@using Client.Services;
+@using Microsoft.AspNetCore.WebUtilities;
+@inject ApiService ApiService
+
+@*<PageTitle>Inicio</PageTitle>
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1>Comunicación Cliente-Servidor</h1>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <button class="btn btn-primary" @onclick="ObtenerDatosDelServidor">Obtener datos del servidor</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">            
+            @if (cargando) {
+                <div class="alert alert-info">Cargando datos...</div>
+            } else if (datos != null) {                <div class="card" style="width: 300px;">
+                    <div class="card-header">
+                        Respuesta del servidor
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">@datos.Mensaje</h5>
+                        <p class="card-text">Fecha: @datos.Fecha.ToString("dd/MM/yyyy HH:mm:ss")</p>
+                    </div>
+                </div>
+            } else if (error != null) {
+                <div class="alert alert-danger">
+                    Error: @error
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private DatosRespuesta datos;
+    private string error;
+    private bool cargando = false;
+
+    private async Task ObtenerDatosDelServidor() {
+        try {
+            cargando = true;
+            error = null;
+            datos = await ApiService.ObtenerDatosAsync();
+        } catch (Exception ex) {
+            error = ex.Message;
+            datos = null;
+        } finally {
+            cargando = false;
+        }
+    }
+}*@
+
+@*aca empieza mi front :D*@
+<Header />
+<Catalogo />
+<Carrito/>
+<head>
+    <meta charset="utf-8">
+    <title>Tienda Online</title>
+    <base href="/" />
+    
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+
+    <link href="css/app.css" rel="stylesheet" />
+</head>
+<body>
+    <div id="app">Cargando...</div>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+@if (productos == null)
+{
+    <p>Cargando productos...</p>
+}
+else if (productos.Count == 0)
+{
+    <p>No se encontraron productos.</p>
+}
+else
+{
+    @foreach (var producto in productos)
+    {
+<ProductCard Producto="producto" CarritoId="carritoId" />
+
+    }
+}
+
+
+@code {
+    private List<Producto> productos = new();
+    private string? query;
+
+    [Inject] NavigationManager NavigationManager { get; set; } = default!;
+
+    
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        var parametros = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (parametros.TryGetValue("busqueda", out var valor))
+            query = valor;
+
+        productos = await ApiService.ObtenerProductosAsync(query);
+    }
+}
+

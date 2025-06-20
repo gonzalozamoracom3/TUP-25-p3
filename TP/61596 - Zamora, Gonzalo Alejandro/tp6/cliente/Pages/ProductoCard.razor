@@ -1,0 +1,44 @@
+@using tp6.Models;
+@using Client.Services;
+@using Microsoft.AspNetCore.WebUtilities;
+
+<div class="product-card card p-3 mb-3 shadow-sm">
+    <img src="@Producto.ImagenUrl" alt="@Producto.Nombre" class="card-img-top" style="max-height: 200px; object-fit: contain;" />
+    <div class="card-body">
+        <h5 class="card-title">@Producto.Nombre</h5>
+        <p class="card-text">@Producto.Descripcion</p>
+        <p class="card-text"><strong>Precio:</strong> $@Producto.Precio</p>
+        <p class="card-text"><strong>Stock:</strong> @Producto.Stock</p>
+        <button class="btn btn-primary" @onclick="AgregarAlCarrito">Agregar al carrito</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Producto Producto { get; set; } = default!;
+    [Parameter] public Guid CarritoId { get; set; }
+    [Inject] public ApiService ApiService{get;set;}
+private async Task AgregarAlCarrito()
+{
+    if (Producto.Stock > 0)
+    {
+        try
+        {
+            var carritoId = await ApiService.ObtenerOCrearCarritoAsync();
+            var exito = await ApiService.AgregarAlCarritoAsync(carritoId, Producto.ProductoId, 1);
+
+            if (!exito)
+            {
+                Console.WriteLine("Error al agregar al carrito.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al agregar producto: {ex.Message}");
+        }
+    }
+    else
+    {
+        Console.WriteLine("No hay stock disponible.");
+    }
+}
+}

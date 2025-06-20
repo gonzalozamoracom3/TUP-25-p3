@@ -43,19 +43,21 @@ namespace tp6.Data
         .HasForeignKey(ci => ci.CarritoId);
 
     // Cargar datos iniciales para los productos
-    modelBuilder.Entity<Producto>().HasData(
-        new Producto { Id = 1, Nombre = "Smartphone Galaxy Z", Descripcion = "Smartphone con pantalla plegable de 7.3\"", Precio = 1200.00m, Stock = 50, ImagenUrl = "https://example.com/smartphone.jpg" },
-        new Producto { Id = 2, Nombre = "Laptop Dell XPS 13", Descripcion = "Laptop ultra delgada con procesador Intel i7", Precio = 999.99m, Stock = 30, ImagenUrl = "https://example.com/laptop-dell-xps.jpg" },
-        new Producto { Id = 3, Nombre = "Auriculares Sony WH-1000XM4", Descripcion = "Auriculares inalámbricos con cancelación de ruido", Precio = 350.00m, Stock = 100, ImagenUrl = "https://example.com/sony-headphones.jpg" },
-        new Producto { Id = 4, Nombre = "Reloj Inteligente Apple Watch Series 7", Descripcion = "Reloj inteligente con monitor de salud y pantalla siempre encendida", Precio = 399.99m, Stock = 80, ImagenUrl = "https://example.com/apple-watch.jpg" },
-        new Producto { Id = 5, Nombre = "Cámara Canon EOS 80D", Descripcion = "Cámara DSLR de 24.2 megapíxeles para fotografía avanzada", Precio = 850.00m, Stock = 40, ImagenUrl = "https://example.com/canon-eos.jpg" },
-        new Producto { Id = 6, Nombre = "Teclado Mecánico Razer Huntsman", Descripcion = "Teclado mecánico con switches ópticos para gamers", Precio = 129.99m, Stock = 60, ImagenUrl = "https://example.com/razer-keyboard.jpg" },
-        new Producto { Id = 7, Nombre = "Monitor UltraWide LG 34WN80C-B", Descripcion = "Monitor curvo de 34 pulgadas con resolución 2560x1080", Precio = 400.00m, Stock = 25, ImagenUrl = "https://example.com/lg-monitor.jpg" },
-        new Producto { Id = 8, Nombre = "Consola PlayStation 5", Descripcion = "Consola de videojuegos con soporte para 4K y ray tracing", Precio = 499.99m, Stock = 15, ImagenUrl = "https://example.com/playstation5.jpg" },
-        new Producto { Id = 9, Nombre = "Nintendo Switch OLED", Descripcion = "Consola portátil con pantalla OLED y soporte para juegos en 4K", Precio = 349.00m, Stock = 50, ImagenUrl = "https://example.com/nintendo-switch.jpg" },
-        new Producto { Id = 10, Nombre = "Silla Gamer DXRacer Formula Series", Descripcion = "Silla ergonómica con soporte lumbar y reposabrazos ajustables", Precio = 299.00m, Stock = 10, ImagenUrl = "https://example.com/dxracer-chair.jpg" }
-    );
-}
+   
+modelBuilder.Entity<Producto>().HasData(
+    new Producto { ProductoId = 1, Nombre = "Smartphone Galaxy Z", Descripcion = "Pantalla plegable", Precio = 1200.00m, Stock = 50, ImagenUrl = "img/smartphone.jpeg" },
+    new Producto { ProductoId = 2, Nombre = "Laptop Dell XPS 13", Descripcion = "Laptop ultra delgada", Precio = 999.99m, Stock = 30, ImagenUrl = "img/laptop.jpeg" },
+    new Producto { ProductoId = 3, Nombre = "Auriculares Sony WH-1000XM4", Descripcion = "Cancelación de ruido", Precio = 350.00m, Stock = 100, ImagenUrl = "img/auriculares.jpeg" },
+    new Producto { ProductoId = 4, Nombre = "Apple Watch Series 7", Descripcion = "Reloj inteligente", Precio = 399.99m, Stock = 80, ImagenUrl = "img/applewatch.jpeg" },
+    new Producto { ProductoId = 5, Nombre = "Cámara Canon EOS 80D", Descripcion = "Fotografía profesional", Precio = 850.00m, Stock = 40, ImagenUrl = "img/canon.jpg" },
+    new Producto { ProductoId = 6, Nombre = "Teclado Razer Huntsman", Descripcion = "Teclado mecánico gamer", Precio = 129.99m, Stock = 60, ImagenUrl = "img/razer.jpg" },
+    new Producto { ProductoId = 7, Nombre = "Monitor LG UltraWide", Descripcion = "Monitor curvo 34''", Precio = 400.00m, Stock = 25, ImagenUrl = "img/monitor.jpeg" },
+     new Producto { ProductoId = 8, Nombre = "PlayStation 5", Descripcion = "Consola de última generación", Precio = 499.99m, Stock = 15, ImagenUrl = "img/ps5.jpeg" },
+    new Producto { ProductoId = 9, Nombre = "Nintendo Switch OLED", Descripcion = "Consola híbrida", Precio = 349.00m, Stock = 50, ImagenUrl = "img/nintendo.jpeg" },
+    new Producto { ProductoId = 10, Nombre = "Silla DXRacer", Descripcion = "Silla ergonómica gamer", Precio = 299.00m, Stock = 10, ImagenUrl = "img/silla.jpeg" }
+  );
+
+  }
 
     }
 }
