@@ -1,46 +1,53 @@
+
 @page "/carrito"
+@using Client.Services;
+@inject ApiService ApiService
 @inject NavigationManager NavigationManager
 @using tp6.Models
-@inject ApiService ApiService
-@using Client.Services;
-@using Microsoft.AspNetCore.WebUtilities;
-<h3>Tu Carrito</h3>
 
-@if (items == null)
+
+<h3 class="mt-4">Carrito de Compras</h3>
+
+@if (items.Count == 0)
 {
-    <p>Cargando...</p>
-}
-else if (!items.Any())
-{
-    <p>El carrito está vacío.</p>
+    <p>Tu carrito está vacío.</p>
 }
 else
 {
-    <table class="table">
+    <table class="table table-striped">
         <thead>
             <tr>
                 <th>Producto</th>
                 <th>Precio</th>
                 <th>Cantidad</th>
                 <th>Total</th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var item in items)
             {
                 <tr>
-                    <td>@item.Producto.Nombre</td>
-                    <td>$@item.Producto.Precio</td>
-                    <td>@item.Cantidad</td>
-                    <td>$@(item.Cantidad * item.Producto.Precio)</td>
+                    <td>@item.Nombre</td>
+                    <td>$@item.Precio</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => ModificarCantidad(item.ProductoId, -1)">-</button>
+                        @item.Cantidad
+                        <button class="btn btn-sm btn-secondary ms-1" @onclick="() => ModificarCantidad(item.ProductoId, 1)">+</button>
+                    </td>
+                    <td>$@item.Subtotal</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" @onclick="() => EliminarItem(item.ProductoId)">Eliminar</button>
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
 
-    <p><strong>Total general: $@items.Sum(i => i.Cantidad * i.Producto.Precio)</strong></p>
+    <p><strong>Total:</strong> $@items.Sum(i => i.Subtotal)</p>
 
-    <button class="btn btn-success" @onclick="ConfirmarCompra">Confirmar compra</button>
+    <button class="btn btn-warning me-2" @onclick="VaciarCarrito">Vaciar carrito</button>
+    <button class="btn btn-success" @onclick="IrAConfirmacion">Confirmar compra</button>
 }
 
 @code {
@@ -48,29 +55,31 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
- 
-            var carrito = await ApiService.ObtenerCarritoCompletoAsync();
-            items = carrito.CarritoItems; // ⬅️ CORREGIDO
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error al cargar el carrito: " + ex.Message);
-        }
+        items = await ApiService.ObtenerCarritoItemsAsync();
     }
 
-    private async Task ConfirmarCompra()
+    private async Task ModificarCantidad(int productoId, int delta)
     {
-        try
-        {
-            await ApiService.ConfirmarCompraAsync();
-            items.Clear();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error al confirmar la compra: " + ex.Message);
-        }
+        var carritoId = await ApiService.ObtenerOCrearCarritoAsync();
+        await ApiService.AgregarAlCarritoAsync(carritoId, productoId, delta);
+        items = await ApiService.ObtenerCarritoItemsAsync();
+    }
+
+    private async Task EliminarItem(int productoId)
+    {
+        await ApiService.EliminarItemCarritoAsync(productoId);
+        items = await ApiService.ObtenerCarritoItemsAsync();
+    }
+
+    private async Task VaciarCarrito()
+    {
+        await ApiService.VaciarCarritoAsync();
+        items.Clear();
+    }
+
+    private void IrAConfirmacion()
+    {
+        NavigationManager.NavigateTo("/confirmacion");
     }
 }
 
