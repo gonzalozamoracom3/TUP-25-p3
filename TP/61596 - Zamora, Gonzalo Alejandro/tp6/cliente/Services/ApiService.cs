@@ -1,14 +1,11 @@
-
-
 using System.Net.Http.Json;
 using Microsoft.JSInterop;
-using tp6.Models; // Asegurate de tener este using para Carrito y CarritoItem
-using Client.Services;
+using tp6.Models;
 using System.Text.Json;
 
 namespace Client.Services
 {
-    public class ApiService 
+    public class ApiService
     {
         private readonly HttpClient _http;
         private readonly IJSRuntime _js;
@@ -18,24 +15,21 @@ namespace Client.Services
         {
             _http = http;
             _js = js;
+            _http.BaseAddress = new Uri("http://localhost:5184"); // Asegurate que coincida con tu backend
         }
-public async Task<List<Producto>> ObtenerProductosAsync(string? busqueda = null)
+
+        // Obtener productos, con parámetro opcional de búsqueda
+        public async Task<List<Producto>> ObtenerProductosAsync(string? busqueda = null)
         {
             try
             {
-                string url = "https://localhost:5177"; 
-
+                string url = "/productos";
                 if (!string.IsNullOrWhiteSpace(busqueda))
                 {
-                    url += $"?busqueda={Uri.EscapeDataString(busqueda)}";
+                    url += $"?q={Uri.EscapeDataString(busqueda)}";
                 }
 
-                var response = await _http.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-
-                var productosJson = await response.Content.ReadAsStringAsync();
-                var productos = JsonSerializer.Deserialize<List<Producto>>(productosJson);
-
+                var productos = await _http.GetFromJsonAsync<List<Producto>>(url);
                 return productos ?? new List<Producto>();
             }
             catch (Exception ex)
@@ -44,66 +38,85 @@ public async Task<List<Producto>> ObtenerProductosAsync(string? busqueda = null)
                 return new List<Producto>();
             }
         }
-        // Obtener o crear carrito y guardarlo en localStorage
+
+        // Obtener o crear carrito, guardando el Id en memoria y localStorage
         public async Task<Guid> ObtenerOCrearCarritoAsync()
         {
             if (carritoId != Guid.Empty)
                 return carritoId;
 
-            var response = await _http.PostAsync($"/carrito", null);
+            var response = await _http.PostAsync("/carrito", null);
             response.EnsureSuccessStatusCode();
             carritoId = await response.Content.ReadFromJsonAsync<Guid>();
+            await _js.InvokeVoidAsync("localStorage.setItem", "carritoId", carritoId.ToString());
             return carritoId;
         }
 
-        // Obtener carrito completo (con sus CarritoItems)
-        public async Task<Carrito> ObtenerCarritoCompletoAsync()
-        {
-            var id = await ObtenerOCrearCarritoAsync();
-            return await _http.GetFromJsonAsync<Carrito>($"/carrito/{id}");
-        }
-
-        // Obtener cantidad total de items del carrito
-        public async Task<int> ObtenerCantidadCarritoAsync()
-        {
-            await ObtenerOCrearCarritoAsync();
-            return await _http.GetFromJsonAsync<int>($"/carrito/{carritoId}/cantidad");
-        }
-
-        // Agregar producto al carrito
-        public async Task<bool> AgregarAlCarritoAsync(Guid carritoId, int ProductoId, int cantidad)
-        {
-            var response = await _http.PutAsync($"/carrito/{carritoId}/{ProductoId}?cantidad={cantidad}", null);
-            return response.IsSuccessStatusCode;
-        }
-
-        // Obtener ítems del carrito
+        // Obtener ítems del carrito con información enriquecida (Nombre, Precio, Subtotal)
         public async Task<List<CarritoItem>> ObtenerCarritoItemsAsync()
         {
             await ObtenerOCrearCarritoAsync();
-            var carrito = await _http.GetFromJsonAsync<Carrito>($"/carrito/{carritoId}");
-            return carrito?.CarritoItems ?? new List<CarritoItem>();
+
+            var response = await _http.GetAsync($"/carrito/{carritoId}/items");
+            if (response.IsSuccessStatusCode)
+            {
+                var items = await response.Content.ReadFromJsonAsync<List<CarritoItem>>();
+                return items ?? new List<CarritoItem>();
+            }
+
+            return new List<CarritoItem>();
         }
 
-        // Vaciar el carrito
+        // Agregar o actualizar cantidad de un producto en el carrito
+        public async Task<bool> AgregarAlCarritoAsync(Guid carritoId, int productoId, int cantidad)
+        {
+            var response = await _http.PutAsync($"/carrito/{carritoId}/{productoId}?cantidad={cantidad}", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        // Vaciar carrito
         public async Task VaciarCarritoAsync()
         {
             await ObtenerOCrearCarritoAsync();
             await _http.DeleteAsync($"/carrito/{carritoId}");
         }
 
-        // Confirmar la compra
-        public async Task<bool> ConfirmarCompraAsync()
+        // Eliminar producto específico del carrito
+        public async Task<bool> EliminarItemCarritoAsync(int productoId)
         {
             await ObtenerOCrearCarritoAsync();
-            var response = await _http.PutAsync($"/carrito/{carritoId}/confirmar", null);
+            var response = await _http.DeleteAsync($"/carrito/{carritoId}/{productoId}");
             return response.IsSuccessStatusCode;
         }
 
-        // Obtener todos los productos del catálogo
-        public async Task<List<Producto>> GetProductosAsync()
+        // Confirmar compra con datos del cliente
+        public async Task<bool> ConfirmarCompraAsync(string nombre, string apellido, string email)
         {
-            return await _http.GetFromJsonAsync<List<Producto>>("/producto") ?? new List<Producto>();
+            await ObtenerOCrearCarritoAsync();
+
+            var datos = new
+            {
+                NombreCliente = nombre,
+                ApellidoCliente = apellido,
+                EmailCliente = email
+            };
+
+            var response = await _http.PutAsJsonAsync($"/carrito/{carritoId}/confirmar", datos);
+            if (response.IsSuccessStatusCode)
+            {
+                await _js.InvokeVoidAsync("localStorage.removeItem", "carritoId");
+                carritoId = Guid.Empty;
+                return true;
+            }
+
+            return false;
         }
-        
-   }}
+
+        // Obtener cantidad total de items en carrito
+        public async Task<int> ObtenerCantidadCarritoAsync()
+        {
+            await ObtenerOCrearCarritoAsync();
+            return await _http.GetFromJsonAsync<int>($"/carrito/{carritoId}/cantidad");
+        }
+    }
+}

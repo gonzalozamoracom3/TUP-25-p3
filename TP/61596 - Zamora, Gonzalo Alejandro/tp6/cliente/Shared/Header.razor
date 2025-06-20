@@ -1,10 +1,7 @@
-
 @inject ApiService ApiService
 @using tp6.Models
-@inject NavigationManager NavigationManager
-@using Client.Services;
-@using Microsoft.AspNetCore.WebUtilities;
 
+@using Client.Services;
 <div class="header d-flex align-items-center justify-content-between p-3 bg-light border-bottom">
     <!-- Logo -->
     <img class="logo" src="https://cdn-icons-png.flaticon.com/512/891/891462.png" alt="Logo de Tienda" width="50" />
@@ -25,14 +22,11 @@
         </button>
     </div>
 </div>
-
 @code {
     private string query = "";
     private int cantidadCarrito = 0;
 
     [Inject] NavigationManager NavigationManager { get; set; } = default!;
-
-   
 
     protected override async Task OnInitializedAsync()
     {
@@ -50,7 +44,11 @@
     {
         if (!string.IsNullOrWhiteSpace(query))
         {
-            NavigationManager.NavigateTo($"/?busqueda={Uri.EscapeDataString(query)}");
+            NavigationManager.NavigateTo($"/?q={Uri.EscapeDataString(query)}", forceLoad: true);
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/");
         }
     }
 
