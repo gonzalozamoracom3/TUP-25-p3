@@ -88,8 +88,21 @@ app.MapPost("/api/carrito", async (AppDbContext db, Carrito item) =>
 
 app.MapPost("/api/ordenes", async (Orden orden, AppDbContext db) =>
 {
+    foreach (var item in orden.Items)
+    {
+        var producto = await db.Productos.FindAsync(item.ProductoId);
+        if (producto == null)
+            return Results.BadRequest($"Producto con ID {item.ProductoId} no encontrado.");
+
+        if (producto.Stock < item.Cantidad)
+            return Results.BadRequest($"Stock insuficiente para {producto.Nombre}.");
+
+        producto.Stock -= item.Cantidad;
+    }
+
     db.Ordenes.Add(orden);
     await db.SaveChangesAsync();
+
     return Results.Ok(new { mensaje = "Orden confirmada", orden.Id });
 });
 

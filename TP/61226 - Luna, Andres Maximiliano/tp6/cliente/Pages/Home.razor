@@ -28,23 +28,18 @@
     @foreach (var producto in productosFiltrados)
     {
         <div class="producto-card">
-            <img src="@producto.ImagenUrl" alt="imagen de @producto.Nombre" style="max-width: 100%; height: auto;" />
+            <img src="@producto.ImagenUrl" class= "imagen-producto" alt="imagen de @producto.Nombre"/>
             <strong>@producto.Nombre</strong>
             <p>Precio: $@producto.Precio</p>
             <p>Descripción: @producto.Descripcion</p>
-            <p>Stock: @producto.StockDisponible</p>
+            <p>Stock: @CarritoService.ObtenerStock(producto.Id)</p>
           
             
-            
 
-            <div class="controles-cantidad">
-                <button @onclick="() => DisminuirCantidad(producto)">-</button>
-                <span>@producto.Cantidad</span>
-                <button @onclick="() => AumentarCantidad(producto)" disabled="@(producto.StockDisponible <= producto.Cantidad)">+</button>
-            </div>
-
-            <button class="btn-agregar" @onclick="() => AgregarProducto(producto)">
-            Agregar al carrito
+            <button class="btn btn-success mt-2" 
+                @onclick="() => AgregarAlCarrito(producto)" 
+                disabled="@(!PuedeAgregar(producto))">
+                Agregar al carrito
             </button>
         </div>
     }
@@ -67,9 +62,13 @@
 
         foreach (var producto in productos)
         {
-            producto.StockDisponible = producto.Stock;
-            producto.Cantidad = 0;
+            if (!CarritoService.StockInicializado(producto.Id))
+            {
+                CarritoService.EstablecerStock(producto.Id, producto.Stock);
+            }
+            producto.StockDisponible = CarritoService.ObtenerStock(producto.Id);
         }
+
 
         productosFiltrados = productos;
     }
@@ -104,19 +103,14 @@
         NavigationManager.NavigateTo("/carrito");
     }
 
-    void AgregarProducto(Producto producto)
+    void AgregarAlCarrito(Producto producto)
     {
-        if (producto.Cantidad <= 0)
-            return;
-
-        for (int i = 0; i < producto.Cantidad; i++)
+        if (CarritoService.ObtenerStock(producto.Id) > 0)
         {
             CarritoService.AgregarAlCarrito(producto);
+            producto.StockDisponible = CarritoService.ObtenerStock(producto.Id);
         }
-
-        producto.Cantidad = 0;
     }
-
 
     private void BuscarProductos()
     {
@@ -131,5 +125,9 @@
         Navigation.NavigateTo("/", true);
     }
 
+    bool PuedeAgregar(Producto producto)
+    {
+        return CarritoService.ObtenerStock(producto.Id) > 0;
+    }
     
 }
