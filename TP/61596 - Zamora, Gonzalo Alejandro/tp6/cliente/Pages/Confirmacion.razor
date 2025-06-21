@@ -1,0 +1,73 @@
+
+@page "/confirmacion"
+@inject ApiService ApiService
+@inject NavigationManager NavigationManager
+@using System.ComponentModel.DataAnnotations
+@using tp6.Models
+@using Client.Services;
+
+<h3 class="mt-4">Confirmación de Compra</h3>
+
+@if (!string.IsNullOrEmpty(mensajeExito))
+{
+    <div class="alert alert-success d-flex align-items-center mt-4" role="alert">
+        <i class="fas fa-check-circle fa-2x me-3"></i>
+        <div>
+            <h5 class="mb-1">¡Gracias por tu compra!</h5>
+            <p class="mb-0">@mensajeExito</p>
+        </div>
+    </div>
+}
+else
+{
+    <EditForm Model="@cliente" OnValidSubmit="ConfirmarCompra">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label>Nombre</label>
+            <InputText class="form-control" @bind-Value="cliente.Nombre" />
+        </div>
+        <div class="mb-3">
+            <label>Apellido</label>
+            <InputText class="form-control" @bind-Value="cliente.Apellido" />
+        </div>
+        <div class="mb-3">
+            <label>Email</label>
+            <InputText class="form-control" @bind-Value="cliente.Email" />
+        </div>
+
+        <button type="submit" class="btn btn-success">Confirmar compra</button>
+    </EditForm>
+}
+
+@code {
+    private ClienteInfo cliente = new();
+    private string mensajeExito = "";
+
+    private async Task ConfirmarCompra()
+    {
+        var ok = await ApiService.ConfirmarCompraAsync(cliente.Nombre, cliente.Apellido, cliente.Email);
+
+        if (ok)
+        {
+            mensajeExito = "Tu compra fue realizada con éxito. Recibirás un correo con los detalles.";
+            await Task.Delay(3000); // Espera antes de volver al inicio
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    public class ClienteInfo
+    {
+        [Required]
+        public string Nombre { get; set; } = "";
+
+        [Required]
+        public string Apellido { get; set; } = "";
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = "";
+    }
+}
+
