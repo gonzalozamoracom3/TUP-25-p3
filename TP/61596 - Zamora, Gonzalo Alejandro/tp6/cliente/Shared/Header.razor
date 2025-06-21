@@ -1,0 +1,59 @@
+@inject ApiService ApiService
+@using tp6.Models
+
+@using Client.Services;
+<div class="header d-flex align-items-center justify-content-between p-3 bg-light border-bottom">
+    <!-- Logo -->
+    <img class="logo" src="https://cdn-icons-png.flaticon.com/512/891/891462.png" alt="Logo de Tienda" width="50" />
+
+    <!-- Barra de búsqueda -->
+    <div class="search-container d-flex align-items-center">
+        <input type="text" @bind="query" placeholder="Buscar productos..." class="form-control me-2" />
+        <button class="btn btn-outline-primary" @onclick="BuscarProductos">Buscar</button>
+    </div>
+
+    <!-- Carrito -->
+    <div class="cart-container position-relative">
+        <button class="btn btn-outline-secondary" @onclick="IrAlCarrito">
+            <i class="fas fa-shopping-cart"></i>
+            <span class="cart-count position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                @cantidadCarrito
+            </span>
+        </button>
+    </div>
+</div>
+@code {
+    private string query = "";
+    private int cantidadCarrito = 0;
+
+    [Inject] NavigationManager NavigationManager { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            cantidadCarrito = await ApiService.ObtenerCantidadCarritoAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error al cargar el carrito: " + ex.Message);
+        }
+    }
+
+    private void BuscarProductos()
+    {
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            NavigationManager.NavigateTo($"/?q={Uri.EscapeDataString(query)}", forceLoad: true);
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    private void IrAlCarrito()
+    {
+        NavigationManager.NavigateTo("/carrito");
+    }
+}
