@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using servidor.Modelos;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,9 +11,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowClientApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5184")
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        policy.WithOrigins("http://localhost:5184").AllowAnyHeader().AllowAnyMethod();
     });
 });
 
@@ -38,31 +37,14 @@ if (app.Environment.IsDevelopment()) {
 
 
 app.UseCors("AllowClientApp");
+app.UseStaticFiles();
 
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<TiendaContext>();
     db.Database.Migrate();
-    if (!db.Productos.Any())
-    {
-        db.Productos.AddRange(new[]
-        {
-            new Producto { Id = 1, Nombre = "Celular A1", Descripcion = "Celular básico", Precio = 120000, Stock = 10, ImagenUrl = "/imagenes/celular.jpg" },
-            new Producto { Id = 2, Nombre = "Notebook B2", Descripcion = "Notebook liviana", Precio = 250000, Stock = 10, ImagenUrl = "/imagenes/notebook-b2.jpg" },
-            new Producto { Id = 3, Nombre = "Auriculares C3", Descripcion = "Auriculares Bluetooth", Precio = 45000, Stock = 20, ImagenUrl = "/imagenes/auriculares-c3.jpg" },
-            new Producto { Id = 4, Nombre = "Mouse Gamer", Descripcion = "Mouse con luces RGB", Precio = 5000, Stock = 26, ImagenUrl = "/imagenes/mouse-gamer.jpg" },
-            new Producto { Id = 5, Nombre = "Teclado Mecánico", Descripcion = "Teclado mecánico retroiluminado", Precio = 15000, Stock = 18, ImagenUrl = "/imagenes/teclado-mecanico.jpg"},
-            new Producto { Id = 6, Nombre = "Monitor 24''", Descripcion = "Full HD 1080p", Precio = 80000, Stock = 2, ImagenUrl = "/imagenes/monitor.jpg" },
-            new Producto { Id = 7, Nombre = "Notebook Lenovo", Descripcion = "Intel i5, 8GB RAM", Precio = 350000, Stock = 9, ImagenUrl = "/imagenes/notebook-lenovo.jpg" },
-            new Producto { Id = 8, Nombre = "Silla Gamer", Descripcion = "Ergonómica y cómoda", Precio = 60000, Stock = 7, ImagenUrl = "/imagenes/silla-gamer.jpg" },
-            new Producto { Id = 9, Nombre = "iphone 16", Descripcion = "Android 12, 128GB", Precio = 180000, Stock = 10, ImagenUrl = "/imagenes/iphone-16.jpg" },
-            new Producto { Id = 10, Nombre = "Tablet 10''", Descripcion = "Ideal para estudiar", Precio = 90000, Stock = 5, ImagenUrl = "/imagenes/tablet.jpg" },
-            new Producto { Id = 11, Nombre = "Webcam Full HD", Descripcion = "Con micrófono incluido", Precio = 10000, Stock = 30, ImagenUrl = "/imagenes/web-cam.jpg" },
-            new Producto { Id = 12, Nombre = "Disco SSD 1TB", Descripcion = "Alta velocidad", Precio = 55000, Stock = 15, ImagenUrl = "/imagenes/disco-ssd-1tb.jpg" }
-        });
-        db.SaveChanges();
-    }
+    CargaProductos.Seed(db);
 }
 
 
@@ -73,52 +55,143 @@ app.MapGet("/productos", async ([FromServices] TiendaContext db, [FromQuery] str
 {
     var query = db.Productos.AsQueryable();
     if (!string.IsNullOrWhiteSpace(q))
-        query = query.Where(p => p.Nombre.Contains(q));
+        query = query.Where(p => p.Nombre.Contains(q) || p.Descripcion.Contains(q));
     return await query.ToListAsync();
+});
+
+
+app.MapPost("/carritos", async ([FromServices] TiendaContext db) =>
+{
+    var carrito = new Carrito { Id = Guid.NewGuid().ToString(), Items = new List<ItemCarrito>() };
+    db.Carritos.Add(carrito);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { id = carrito.Id });
+});
+
+
+app.MapGet("/carritos/{carrito}", async ([FromServices] TiendaContext db, string carrito) =>
+{
+    var c = await db.Carritos.Include(x => x.Items).ThenInclude(i => i.Producto)
+                             .FirstOrDefaultAsync(x => x.Id == carrito);
+    if (c == null) return Results.NotFound();
+    return Results.Ok(c.Items.Select(i => new {
+        i.ProductoId,
+        i.Producto.Nombre,
+        i.Producto.Precio,
+        i.Cantidad,
+        i.Producto.ImagenUrl
+    }));
+});
+
+
+app.MapDelete("/carritos/{carrito}", async ([FromServices] TiendaContext db, string carrito) =>
+{
+    var c = await db.Carritos.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == carrito);
+    if (c == null) return Results.NotFound();
+
+    // Devuelve el stock de todos los productos del carrito
+    foreach (var item in c.Items)
+    {
+        var p = await db.Productos.FindAsync(item.ProductoId);
+        if (p != null)
+            p.Stock += item.Cantidad;
+    }
+
+    db.ItemCarritos.RemoveRange(c.Items);
+    c.Items.Clear();
+    await db.SaveChangesAsync();
+    return Results.Ok();
 });
 
 
 app.MapPut("/carritos/{carrito}/confirmar", async ([FromServices] TiendaContext db, string carrito, [FromBody] CompraConfirmacionDto dto) =>
 {
-    foreach (var item in dto.Items)
+    var c = await db.Carritos.Include(x => x.Items).ThenInclude(i => i.Producto)
+                             .FirstOrDefaultAsync(x => x.Id == carrito);
+    if (c == null) return Results.NotFound();
+
+    // Validar stock antes de confirmar (opcional, ya está reservado)
+    foreach (var item in c.Items)
     {
-        var prod = await db.Productos.FindAsync(item.ProductoId);
-        if (prod == null || prod.Stock < item.Cantidad)
-            return Results.BadRequest($"Stock insuficiente para {prod?.Nombre ?? "producto desconocido"}");
-        prod.Stock -= item.Cantidad;
+        if (item.Producto.Stock < 0)
+            return Results.BadRequest($"Stock insuficiente para {item.Producto.Nombre}");
     }
+
+    // NO descontar stock aquí
+
     var compra = new Compra
     {
         Fecha = DateTime.Now,
-        Total = dto.Items.Sum(i => i.PrecioUnitario * i.Cantidad),
+        Total = c.Items.Sum(i => i.Producto.Precio * i.Cantidad),
         NombreCliente = dto.Nombre,
         ApellidoCliente = dto.Apellido,
         EmailCliente = dto.Email,
-        Items = dto.Items.Select(i => new Item
+        Items = c.Items.Select(i => new Item
         {
             ProductoId = i.ProductoId,
             Cantidad = i.Cantidad,
-            PrecioUnitario = i.PrecioUnitario
+            PrecioUnitario = i.Producto.Precio
         }).ToList()
     };
     db.Compras.Add(compra);
+    db.ItemCarritos.RemoveRange(c.Items);
+    c.Items.Clear();
+    await db.SaveChangesAsync();
+    return Results.Ok(new { mensaje = "Compra confirmada" });
+});
+
+
+app.MapPut("/carritos/{carrito}/{producto}", async ([FromServices] TiendaContext db, string carrito, int producto, [FromBody] int cantidad) =>
+{
+    var c = await db.Carritos.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == carrito);
+    var p = await db.Productos.FindAsync(producto);
+    if (c == null || p == null) return Results.NotFound();
+    if (cantidad <= 0) return Results.BadRequest("La cantidad debe ser mayor a 0");
+
+    var item = c.Items.FirstOrDefault(i => i.ProductoId == producto);
+    int cantidadActual = item?.Cantidad ?? 0;
+    int diferencia = cantidad - cantidadActual;
+
+    if (diferencia > 0)
+    {
+        if (p.Stock < diferencia)
+            return Results.BadRequest("Stock insuficiente");
+        p.Stock -= diferencia;
+    }
+    else if (diferencia < 0)
+    {
+        p.Stock += -diferencia;
+    }
+
+    if (item == null)
+    {
+        item = new ItemCarrito { ProductoId = producto, Cantidad = cantidad, CarritoId = carrito };
+        c.Items.Add(item);
+        db.ItemCarritos.Add(item);
+    }
+    else
+    {
+        item.Cantidad = cantidad;
+    }
     await db.SaveChangesAsync();
     return Results.Ok();
 });
 
+app.MapDelete("/carritos/{carrito}/{producto}", async ([FromServices] TiendaContext db, string carrito, int producto) =>
+{
+    var c = await db.Carritos.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == carrito);
+    if (c == null) return Results.NotFound();
+    var item = c.Items.FirstOrDefault(i => i.ProductoId == producto);
+    if (item == null) return Results.NotFound();
+
+    // Devuelve el stock al producto
+    var p = await db.Productos.FindAsync(producto);
+    if (p != null)
+        p.Stock += item.Cantidad;
+
+    c.Items.Remove(item);
+    db.ItemCarritos.Remove(item);
+    await db.SaveChangesAsync();
+    return Results.Ok();
+});
 app.Run();
-
-public class CompraConfirmacionDto
-{
-    public string Nombre { get; set; }
-    public string Apellido { get; set; }
-    public string Email { get; set; }
-    public List<ItemCompraDto> Items { get; set; }
-}
-
-public class ItemCompraDto
-{
-    public int ProductoId { get; set; }
-    public int Cantidad { get; set; }
-    public decimal PrecioUnitario { get; set; }
-}

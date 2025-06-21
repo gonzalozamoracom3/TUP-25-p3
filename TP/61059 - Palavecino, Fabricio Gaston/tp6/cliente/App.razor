@@ -1,4 +1,24 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
+﻿
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject CarritoService CarritoService
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(CarritoService.CarritoId))
+        {
+            var resp = await Http.PostAsync("/carritos", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                var json = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                CarritoService.CarritoId = json.GetProperty("id").GetString();
+            }
+        }
+    }
+}
+
+<Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
     </Found>
@@ -8,3 +28,5 @@
         </LayoutView>
     </NotFound>
 </Router>
+
+

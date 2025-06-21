@@ -1,0 +1,118 @@
+@using tp6.cliente.Models
+@page "/carrito"
+@inject NavigationManager NavigationManager
+@inject CarritoService CarritoService
+@inject HttpClient Http
+
+<div class="carrito">
+    @if (!CarritoService.Carrito.Any())
+    {
+        <p style="font-size:1.2rem; color:#888; text-align:center;">El carrito está vacío.</p>
+        <span class="volver" @onclick="IrAlCatalogo">← Volver</span>
+    }
+    else
+    {
+        <h2 style="color:#4e54c8; font-size:2rem; margin-bottom:1.2rem;">Carrito de compras</h2>
+        <table class="tabla-carrito">
+            <tr>
+                <th>Producto</th>
+                <th>Unidades</th>
+                <th>Precio</th>
+                <th>Importe</th>
+                <th>Acciones</th>
+            </tr>
+            @foreach (var item in CarritoService.Carrito)
+            {
+                <tr>
+                    <td>@item.Nombre</td>
+                    <td>@item.Cantidad</td>
+                    <td>$@item.Precio</td>
+                    <td>$@(item.Precio * item.Cantidad)</td>
+                    <td>
+                        <button class="btn-cantidad" @onclick="() => CambiarCantidad(item, 1)">+</button>
+                        <button class="btn-cantidad" @onclick="() => CambiarCantidad(item, -1)">-</button>
+                        <button class="btn-eliminar" @onclick="() => EliminarDelCarrito(item)">Eliminar</button>
+                    </td>
+                </tr>
+            }
+        </table>
+        <div class="resumen">
+            <b>Total: $@TotalCarritoImporte</b>
+        </div>
+        <button class="btn-vaciar" @onclick="VaciarCarrito">Vaciar carrito</button>
+        <button class="btn-confirmar" @onclick="IrAConfirmacion">Confirmar compra</button>
+        <span class="volver" @onclick="IrAlCatalogo">← Volver al catálogo</span>
+    }
+</div>
+
+@code {
+    decimal TotalCarritoImporte => CarritoService.Carrito.Sum(i => i.Precio * i.Cantidad);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCarrito();
+    }
+
+    async Task CargarCarrito()
+    {
+        if (string.IsNullOrEmpty(CarritoService.CarritoId))
+        {
+            var resp = await Http.PostAsync("/carritos", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                var json = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                CarritoService.CarritoId = json.GetProperty("id").GetString();
+            }
+        }
+        if (!string.IsNullOrEmpty(CarritoService.CarritoId))
+        {
+            var items = await Http.GetFromJsonAsync<List<ItemCarrito>>($"/carritos/{CarritoService.CarritoId}");
+            CarritoService.Carrito = items ?? new List<ItemCarrito>();
+        }
+    }
+
+    async Task CambiarCantidad(ItemCarrito item, int cambio)
+    {
+        if (string.IsNullOrEmpty(CarritoService.CarritoId))
+            return;
+
+        int nuevaCantidad = item.Cantidad + cambio;
+        if (nuevaCantidad <= 0)
+        {
+            await Http.DeleteAsync($"/carritos/{CarritoService.CarritoId}/{item.ProductoId}");
+        }
+        else
+        {
+            await Http.PutAsJsonAsync($"/carritos/{CarritoService.CarritoId}/{item.ProductoId}", nuevaCantidad);
+        }
+        await CargarCarrito();
+    }
+
+    async Task EliminarDelCarrito(ItemCarrito item)
+    {
+        if (string.IsNullOrEmpty(CarritoService.CarritoId))
+            return;
+
+        await Http.DeleteAsync($"/carritos/{CarritoService.CarritoId}/{item.ProductoId}");
+        await CargarCarrito();
+    }
+
+    async Task VaciarCarrito()
+    {
+        if (string.IsNullOrEmpty(CarritoService.CarritoId))
+            return;
+
+        await Http.DeleteAsync($"/carritos/{CarritoService.CarritoId}");
+        CarritoService.Carrito.Clear();
+    }
+
+    void IrAlCatalogo()
+    {
+        NavigationManager.NavigateTo("/catalogo");
+    }
+
+    void IrAConfirmacion()
+    {
+        NavigationManager.NavigateTo("/confirmacion");
+    }
+}
