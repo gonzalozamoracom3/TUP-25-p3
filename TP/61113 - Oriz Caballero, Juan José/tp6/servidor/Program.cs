@@ -5,12 +5,16 @@ using Microsoft.AspNetCore.Mvc;
 using System.Globalization;
 using System.Text;
 
+
+//funciona en las dos pc en teoría(teoria(creo))
+  
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Agregar servicios CORS para permitir solicitudes desde el cliente
 builder.Services.AddCors(options => {
     options.AddPolicy("AllowClientApp", policy => {
-        policy.WithOrigins("http://localhost:5177", "https://localhost:5184")
+        policy.WithOrigins("http://localhost:5177")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -40,6 +44,18 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler(errorApp =>
+    {
+        errorApp.Run(async context =>
+        {
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("{\"error\": \"Ocurrió un error inesperado en el servidor.\"}");
+        });
+    });
 }
 
 // Usar CORS con la política definida
@@ -148,31 +164,46 @@ app.MapPut("/carritos/{carritoId}/confirmar", async (int carritoId, AppDbContext
                           .ThenInclude(i => i.Producto)
                           .FirstOrDefaultAsync(c => c.Id == carritoId);
 
-    if (carrito == null) return Results.NotFound("Carrito no encontrado.");
-    if (carrito.Items.Count == 0) return Results.BadRequest("El carrito está vacío.");
+    if (carrito == null)
+        return Results.NotFound("Carrito no encontrado.");
+    if (carrito.Items.Count == 0)
+        return Results.BadRequest("El carrito está vacío.");
 
-    // VALIDACION
+    // VALIDACIÓN DE STOCK
     foreach (var item in carrito.Items)
     {
         if (item.Producto.Stock < item.Cantidad)
             return Results.BadRequest($"Stock insuficiente para el producto {item.Producto.Nombre}.");
+    }
+
+    // DESCONTAR STOCK
+    foreach (var item in carrito.Items)
+    {
         item.Producto.Stock -= item.Cantidad;
     }
 
+    // CREAR COMPRA Y SUS ITEMS
     var compra = new Compra
     {
         Fecha = DateTime.Now,
         NombreCliente = datos.Nombre,
         ApellidoCliente = datos.Apellido,
         EmailCliente = datos.Email,
-        Total = carrito.Items.Sum(i => i.Cantidad * i.PrecioUnitario)
+        Total = carrito.Items.Sum(i => i.Cantidad * i.PrecioUnitario),
+        Items = carrito.Items.Select(i => new ItemCompra
+        {
+            ProductoId = i.ProductoId,
+            Cantidad = i.Cantidad,
+            PrecioUnitario = i.PrecioUnitario
+        }).ToList()
     };
 
     db.Compras.Add(compra);
-    carrito.Items.Clear(); 
+    db.Carritos.Remove(carrito);
+
     await db.SaveChangesAsync();
 
-    return Results.Ok("Compra confirmada.");
+    return Results.Ok(new { mensaje = "Compra confirmada y carrito eliminado." });
 });
 
 // PUT: Agregar o actualizar producto en carrito
