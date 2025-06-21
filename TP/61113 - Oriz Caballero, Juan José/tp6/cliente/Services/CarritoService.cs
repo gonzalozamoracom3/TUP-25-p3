@@ -113,7 +113,12 @@ namespace Cliente.Services
             await AsegurarCarritoId();
 
             var response = await _http.PutAsJsonAsync($"carritos/{_carritoId}/confirmar", datos);
-            if (!response.IsSuccessStatusCode) return false;
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"❌ Error al confirmar compra: {error}");
+                return false;
+            }
 
             carrito = new CarritoDto { Id = _carritoId, Items = new List<ItemCarritoDto>() };
             TotalItems = 0;
