@@ -1,0 +1,76 @@
+
+
+@page "/"
+
+
+
+@using Client.Services
+@inject ApiService ApiService
+@inject NavigationManager NavigationManager
+@using tp6.Models
+
+<h3 class="mt-4">Catálogo de Productos</h3>
+
+@if (productos == null)
+{
+    <p>Cargando productos...</p>
+}
+else if (productos.Count == 0)
+{
+    <p>No se encontraron productos.</p>
+}
+else
+{
+    <div class="product-list">
+        @foreach (var producto in productos)
+        {
+            <div class="product-card">
+                <img src="@producto.ImagenUrl" alt="@producto.Nombre" />
+                <h3>@producto.Nombre</h3>
+                <p>@producto.Descripcion</p>
+                <p><strong>Stock:</strong> @producto.Stock</p>
+                <p><strong>Precio:</strong> $@producto.Precio</p>
+                <button class="btn btn-primary" @onclick="() => AgregarAlCarrito(producto.ProductoId)">Agregar al carrito</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Producto> productos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarProductosDesdeQuery();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await CargarProductosDesdeQuery();
+    }
+
+    private async Task CargarProductosDesdeQuery()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        string? busqueda = queryParams["q"];
+
+        if (string.IsNullOrWhiteSpace(busqueda))
+        {
+            productos = await ApiService.ObtenerProductosAsync(); // carga todos
+        }
+        else
+        {
+            productos = await ApiService.ObtenerProductosAsync(busqueda); // carga filtrados
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task AgregarAlCarrito(int productoId)
+    {
+        var carritoId = await ApiService.ObtenerOCrearCarritoAsync();
+        await ApiService.AgregarAlCarritoAsync(carritoId, productoId, 1);
+        NavigationManager.NavigateTo("/carrito");
+    }
+}
